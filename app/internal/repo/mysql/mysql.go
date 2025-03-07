@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"fmt"
+	"github.com/Dimoonevs/vocal-flow/app/internal/models"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
 	"log"
@@ -77,4 +79,44 @@ func (s *Storage) SaveTranscription(subtitlesMap map[string]string, videoID int)
 	logrus.Infof("Subtitles successfully saved in DB")
 
 	return nil
+}
+
+func (s *Storage) SaveVideoWithSub(id int, path string) error {
+	query := `UPDATE video_ai SET subtitles_video_url = ? WHERE video_id = ?`
+
+	_, err := s.db.Exec(query, path, id)
+	if err != nil {
+		logrus.Errorf("Failed to save video to DB: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (s *Storage) GetVideoSubtitles(id int) ([]models.SubtitlesData, string, string, error) {
+	query := `
+		SELECT f.filename, f.filepath, v.subtitles_url
+		FROM files f
+		LEFT JOIN video_ai v ON f.id = v.video_id
+		WHERE f.id = ?;
+	`
+
+	row := s.db.QueryRow(query, id)
+	var filepath, filename string
+	var subtitlesURL sql.NullString
+
+	err := row.Scan(&filename, &filepath, &subtitlesURL)
+	if err != nil {
+		logrus.Errorf("Failed to get subtitles from DB: %v", err)
+		return nil, "", "", fmt.Errorf("scan error: %w", err)
+	}
+
+	var subtitlesData []models.SubtitlesData
+
+	err = json.Unmarshal([]byte(subtitlesURL.String), &subtitlesData)
+	if err != nil {
+		logrus.Errorf("Failed to parse subtitles JSON: %w", err)
+		return nil, "", "", fmt.Errorf("failed to parse subtitles JSON: %w", err)
+	}
+
+	return subtitlesData, filepath, filename, nil
 }

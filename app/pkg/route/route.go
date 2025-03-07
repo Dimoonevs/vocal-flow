@@ -25,7 +25,7 @@ func RequestHandler(ctx *fasthttp.RequestCtx) {
 	case "/stitching/subtitles":
 		handleStitchingSub(ctx)
 	case "/summary":
-		//handleSummaryVideo(ctx)
+		handleSummaryVideo(ctx)
 	case "/translate":
 		handleTranslateVideo(ctx)
 	default:
@@ -62,9 +62,25 @@ func handleTranscriptionVideo(ctx *fasthttp.RequestCtx) {
 }
 
 func handleStitchingSub(ctx *fasthttp.RequestCtx) {
+	id := ctx.QueryArgs().GetUintOrZero("id")
 
+	if id == 0 {
+		respJSON.WriteJSONError(ctx, fasthttp.StatusBadRequest, nil, "ID video not specified or invalid")
+		return
+	}
+
+	path, err := service.StitchSubtitlesIntoVideo(id)
+	if err != nil {
+		respJSON.WriteJSONError(ctx, fasthttp.StatusBadRequest, err, "Failed to stitch subtitles")
+		return
+	}
+	respJSON.WriteJSONResponse(ctx, fasthttp.StatusCreated, "Created stitch subtitles into video", path)
 }
 
 func handleTranslateVideo(ctx *fasthttp.RequestCtx) {
+
+}
+
+func handleSummaryVideo(ctx *fasthttp.RequestCtx) {
 
 }

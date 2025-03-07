@@ -6,7 +6,7 @@ type Video struct {
 
 type TranscriptionRequest struct {
 	ID    int      `json:"id"`
-	Langs []string `json:"langs"`
+	Langs []string `json:"langs,omitempty"`
 }
 type WhisperResponse struct {
 	Task     string     `json:"task"`
@@ -55,4 +55,9 @@ type OpenAIResponse struct {
 	Choices []struct {
 		Message Message `json:"message"`
 	} `json:"choices"`
+}
+
+type SubtitlesData struct {
+	URI  string `json:"uri"`
+	Lang string `json:"lang"`
 }

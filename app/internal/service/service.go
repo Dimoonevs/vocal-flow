@@ -132,3 +132,23 @@ func CreateTranscription(id int, langs []string) (map[string]string, error) {
 
 	return subtitlesMap, nil
 }
+
+func StitchSubtitlesIntoVideo(id int) (string, error) {
+	videoSubtitle, filePath, filename, err := mysql.GetConnection().GetVideoSubtitles(id)
+	if err != nil {
+		return "", err
+	}
+
+	dirPath := filepath.Dir(filePath)
+
+	localPath, err := lib.StitchVideoSubtitles(dirPath, filePath, filename, videoSubtitle)
+	if err != nil {
+		logrus.Errorf("Failed to stitch video subtitles: %v", err)
+		return "", err
+	}
+	if err = mysql.GetConnection().SaveVideoWithSub(id, localPath); err != nil {
+		return "", err
+	}
+
+	return lib.GetVideoPublicLink(localPath), nil
+}
