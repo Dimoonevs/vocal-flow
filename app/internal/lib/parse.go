@@ -6,6 +6,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -42,4 +44,26 @@ func SaveSRT(lang string, segments []models.TranslatedSegment, outputDir string)
 
 	logrus.Infof("SRT saved: %s", filePath)
 	return filePath, nil
+}
+
+func ReadSRTFile(filepath string) (string, error) {
+	content, err := os.ReadFile(filepath)
+	if err != nil {
+		logrus.Errorf("Failed to read SRT file: %s", err)
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	text := string(content)
+
+	re := regexp.MustCompile(`\d+\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}\n`)
+	cleanText := re.ReplaceAllString(text, "")
+
+	lines := strings.Split(cleanText, "\n")
+	var filtered []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			filtered = append(filtered, strings.TrimSpace(line))
+		}
+	}
+	return strings.Join(filtered, " "), nil
 }

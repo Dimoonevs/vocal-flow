@@ -1,23 +1,15 @@
 package lib
 
 import (
-	"flag"
 	"fmt"
 	"github.com/Dimoonevs/vocal-flow/app/internal/models"
 	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 )
 
-var (
-	staticRootDir = flag.String("staticDir", "/var/www/file_service/", "static dir")
-	publicHost    = flag.String("publicHost", "http://your-video-service.pp.ua/video/service/", "public host")
-)
-
 func StitchVideoSubtitles(pathSave, pathVideo, filename string, subtitlesData []models.SubtitlesData) (string, error) {
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	videoSavePath := fmt.Sprintf("%s/%s_sub_%s", pathSave, timestamp, filename)
+	videoSavePath := fmt.Sprintf("%s/%s_sub_%s", pathSave, strconv.FormatInt(time.Now().Unix(), 10), filename)
 	args := []string{"-i", pathVideo}
 
 	for _, subtitleData := range subtitlesData {
@@ -33,7 +25,6 @@ func StitchVideoSubtitles(pathSave, pathVideo, filename string, subtitlesData []
 		args = append(args, "-c:s", "mov_text", "-metadata:s:s:"+strconv.Itoa(i), "language="+subtitleData.Lang)
 	}
 
-	// Указываем копирование видео и аудио
 	args = append(args, "-c:v", "copy", "-c:a", "copy", videoSavePath)
 
 	cmd := exec.Command("ffmpeg", args...)
@@ -43,12 +34,4 @@ func StitchVideoSubtitles(pathSave, pathVideo, filename string, subtitlesData []
 	}
 
 	return videoSavePath, nil
-}
-
-func GetVideoLocalLink(link string) string {
-	return strings.ReplaceAll(link, *staticRootDir, *publicHost)
-}
-
-func GetVideoPublicLink(link string) string {
-	return strings.ReplaceAll(link, *publicHost, *staticRootDir)
 }

@@ -82,5 +82,16 @@ func handleTranslateVideo(ctx *fasthttp.RequestCtx) {
 }
 
 func handleSummaryVideo(ctx *fasthttp.RequestCtx) {
+	id := ctx.QueryArgs().GetUintOrZero("id")
+	if id == 0 {
+		respJSON.WriteJSONError(ctx, fasthttp.StatusBadRequest, nil, "ID video not specified or invalid")
+		return
+	}
 
+	summary, err := service.GetSummary(id)
+	if err != nil {
+		respJSON.WriteJSONError(ctx, fasthttp.StatusNotFound, err, "Failed to get summary")
+		return
+	}
+	respJSON.WriteJSONResponse(ctx, fasthttp.StatusCreated, "Created summary", summary)
 }

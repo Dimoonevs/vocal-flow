@@ -120,3 +120,48 @@ func (s *Storage) GetVideoSubtitles(id int) ([]models.SubtitlesData, string, str
 
 	return subtitlesData, filepath, filename, nil
 }
+
+func (s *Storage) GetOriginalSubtitles(id int) (string, error) {
+	query := `
+		SELECT subtitles_url
+		FROM video_ai
+		WHERE video_id = ?;
+`
+
+	row := s.db.QueryRow(query, id)
+	var subtitlesURL sql.NullString
+	err := row.Scan(&subtitlesURL)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		logrus.Errorf("Failed to get subtitles from DB: %v", err)
+		return "", err
+	}
+
+	var subtitlesData []models.SubtitlesData
+	err = json.Unmarshal([]byte(subtitlesURL.String), &subtitlesData)
+	if err != nil {
+		logrus.Errorf("Failed to parse subtitles JSON: %w", err)
+		return "", err
+	}
+
+	for _, subtitles := range subtitlesData {
+		if subtitles.Lang == "original" {
+			return subtitles.URI, nil
+		}
+	}
+	logrus.Errorf("Failed to get original subtitles from DB: %v", err)
+	return "", fmt.Errorf("failed to find original subtitle from DB")
+}
+
+func (s *Storage) SaveSummary(summary string, id int) error {
+	query := `UPDATE video_ai SET summary = ? WHERE video_id = ?`
+
+	_, err := s.db.Exec(query, summary, id)
+	if err != nil {
+		logrus.Errorf("Failed to save summary to DB: %v", err)
+		return err
+	}
+	return nil
+}

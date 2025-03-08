@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	libVideo "github.com/Dimoonevs/video-service/app/pkg/lib"
 	"github.com/Dimoonevs/vocal-flow/app/internal/lib"
 	"github.com/Dimoonevs/vocal-flow/app/internal/models"
 	"github.com/Dimoonevs/vocal-flow/app/internal/repo/mysql"
@@ -150,5 +151,24 @@ func StitchSubtitlesIntoVideo(id int) (string, error) {
 		return "", err
 	}
 
-	return lib.GetVideoPublicLink(localPath), nil
+	return libVideo.GetVideoPublicLink(localPath), nil
+}
+
+func GetSummary(id int) (string, error) {
+	originPath, err := mysql.GetConnection().GetOriginalSubtitles(id)
+	if err != nil {
+		return "", err
+	}
+	text, err := lib.ReadSRTFile(originPath)
+	if err != nil {
+		return "", err
+	}
+	summary, err := lib.GetSummary(text)
+	if err != nil {
+		return "", err
+	}
+	if err = mysql.GetConnection().SaveSummary(summary, id); err != nil {
+		return "", err
+	}
+	return summary, nil
 }

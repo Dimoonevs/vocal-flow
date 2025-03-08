@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Dimoonevs/vocal-flow/app/internal/models"
+	"github.com/sirupsen/logrus"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -66,7 +67,7 @@ func TranscribeVideo(filePath string) (*models.WhisperResponse, error) {
 
 func TranslateText(text, targetLang string) (string, error) {
 	requestBody, err := json.Marshal(models.OpenAIRequest{
-		Model: "gpt-3.5-turbo",
+		Model: "gpt-4o-mini",
 		Messages: []models.Message{
 			{Role: "system", Content: fmt.Sprintf("Translate the following text to %s and remove all punctuation marks. Respond with only the translated text and nothing else.", targetLang)},
 			{Role: "user", Content: text},
@@ -103,6 +104,55 @@ func TranslateText(text, targetLang string) (string, error) {
 
 	if len(result.Choices) == 0 || result.Choices[0].Message.Content == "" {
 		return "", fmt.Errorf("no translation found in response")
+	}
+
+	return result.Choices[0].Message.Content, nil
+}
+
+func GetSummary(text string) (string, error) {
+	requestBody, err := json.Marshal(models.OpenAIRequest{
+		Model: "gpt-4-turbo",
+		Messages: []models.Message{
+			{Role: "system", Content: "Summarize the following text in a concise manner."},
+			{Role: "user", Content: text},
+		},
+		MaxTokens: 300,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", openAITranslateURL, bytes.NewBuffer(requestBody))
+	if err != nil {
+		logrus.Errorf("failed to create request: %s", err)
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+openAIKey)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Errorf("failed to send request: %s", err)
+		return "", fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		logrus.Errorf("OpenAI API error: %s", body)
+		return "", fmt.Errorf("OpenAI API error: %s", body)
+	}
+
+	var result models.OpenAIResponse
+	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		logrus.Errorf("failed to decode response: %s", err)
+		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if len(result.Choices) == 0 || result.Choices[0].Message.Content == "" {
+		logrus.Error("no summary found in response")
+		return "", fmt.Errorf("no summary found in response")
 	}
 
 	return result.Choices[0].Message.Content, nil
