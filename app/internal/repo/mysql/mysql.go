@@ -165,3 +165,90 @@ func (s *Storage) SaveSummary(summary string, id int) error {
 	}
 	return nil
 }
+
+func (s *Storage) GetDataByVideoID(id int) (*models.DataAI, error) {
+	query := `SELECT 
+		video_id, 
+		subtitles_url, 
+		subtitles_video_url, 
+		translate_video_url, 
+		summary
+	FROM video_ai 
+	WHERE video_id = ?;`
+
+	row := s.db.QueryRow(query, id)
+	dataAI := &models.DataAI{}
+	err := row.Scan(&dataAI.VideoId, &dataAI.SubtitlesURL, &dataAI.SubtitlesVideoURL, &dataAI.TranslateVideoURL, &dataAI.Summary)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		logrus.Errorf("Failed to get subtitles from DB: %v", err)
+		return nil, err
+	}
+	return dataAI, nil
+
+}
+
+func (s *Storage) GetAllDataByUserID(userID int) ([]*models.DataAI, error) {
+	query := `SELECT 
+		va.video_id, 
+		va.subtitles_url, 
+		va.subtitles_video_url, 
+		va.translate_video_url, 
+		va.summary
+	FROM video_ai va
+	JOIN files f ON va.video_id = f.id
+	WHERE f.user_id = ?;`
+
+	rows, err := s.db.Query(query, userID)
+	if err != nil {
+		logrus.Errorf("Failed to query data by user_id: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := []*models.DataAI{}
+
+	for rows.Next() {
+		dataAI := &models.DataAI{}
+		err := rows.Scan(
+			&dataAI.VideoId,
+			&dataAI.SubtitlesURL,
+			&dataAI.SubtitlesVideoURL,
+			&dataAI.TranslateVideoURL,
+			&dataAI.Summary,
+		)
+		if err != nil {
+			logrus.Errorf("Failed to scan row: %v", err)
+			continue
+		}
+		result = append(result, dataAI)
+	}
+
+	if err = rows.Err(); err != nil {
+		logrus.Errorf("Rows iteration error: %v", err)
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (s *Storage) GetUserSetting(userID, settingID int) (*models.UserSettings, error) {
+	query := `SELECT id, user_id, token, gpt_model, whisper_model, tts_model, name 
+	          FROM user_ai_settings WHERE user_id = ? AND id = ?`
+
+	var settings models.UserSettings
+	row := s.db.QueryRow(query, userID, settingID)
+
+	if err := row.Scan(&settings.ID, &settings.UserID, &settings.AIToken, &settings.GPTModel, &settings.WhisperModel, &settings.TTSModel, &settings.Name); err != nil {
+		if err == sql.ErrNoRows {
+			logrus.Infof("User settings not found by setting ")
+			return nil, fmt.Errorf("user settings not found")
+		}
+		logrus.Errorf("Cannot get user setting: %v", err)
+		return nil, err
+	}
+
+	return &settings, nil
+}

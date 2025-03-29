@@ -1,13 +1,17 @@
 package models
 
+import "database/sql"
+
 type Video struct {
 	URI string `json:"uri"`
 }
 
 type TranscriptionRequest struct {
-	ID    int      `json:"id"`
-	Langs []string `json:"langs,omitempty"`
+	ID        int      `json:"id"`
+	Langs     []string `json:"langs,omitempty"`
+	SettingID int      `json:"setting_id"`
 }
+
 type WhisperResponse struct {
 	Task     string     `json:"task"`
 	Language string     `json:"language"`
@@ -60,4 +64,22 @@ type OpenAIResponse struct {
 type SubtitlesData struct {
 	URI  string `json:"uri"`
 	Lang string `json:"lang"`
+}
+
+type UserSettings struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	UserID       int    `json:"user_id"`
+	AIToken      string `json:"ai_token"`
+	WhisperModel string `json:"whisper_model"`
+	TTSModel     string `json:"tts_model"`
+	GPTModel     string `json:"gpt_model"`
+}
+
+type DataAI struct {
+	VideoId           int            `json:"video_id"`
+	SubtitlesURL      sql.NullString `json:"subtitles_url"`
+	SubtitlesVideoURL sql.NullString `json:"subtitles_video_url"`
+	TranslateVideoURL sql.NullString `json:"translate_video_url"`
+	Summary           sql.NullString `json:"summary"`
 }

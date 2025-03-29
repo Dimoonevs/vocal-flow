@@ -17,7 +17,7 @@ const openAIKey = "sk-proj-gWz5hr2P3bwaYwYPvW65_krE9DaioeKl1d7GV6UynLzCoaBVd8pnK
 
 const openAITranslateURL = "https://api.openai.com/v1/chat/completions"
 
-func TranscribeVideo(filePath string) (*models.WhisperResponse, error) {
+func TranscribeVideo(filePath string, userSetting *models.UserSettings) (*models.WhisperResponse, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
@@ -36,7 +36,7 @@ func TranscribeVideo(filePath string) (*models.WhisperResponse, error) {
 		return nil, fmt.Errorf("failed to copy file data: %w", err)
 	}
 
-	_ = writer.WriteField("model", "whisper-1")
+	_ = writer.WriteField("model", userSetting.WhisperModel)
 	_ = writer.WriteField("response_format", "verbose_json")
 	_ = writer.WriteField("timestamp_granularities[]", "segment")
 
@@ -49,7 +49,7 @@ func TranscribeVideo(filePath string) (*models.WhisperResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+openAIKey)
+	req.Header.Set("Authorization", "Bearer "+userSetting.AIToken)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	client := &http.Client{}
@@ -65,9 +65,9 @@ func TranscribeVideo(filePath string) (*models.WhisperResponse, error) {
 	return response, nil
 }
 
-func TranslateText(text, targetLang string) (string, error) {
+func TranslateText(text, targetLang string, userSetting *models.UserSettings) (string, error) {
 	requestBody, err := json.Marshal(models.OpenAIRequest{
-		Model: "gpt-4o-mini",
+		Model: userSetting.GPTModel,
 		Messages: []models.Message{
 			{Role: "system", Content: fmt.Sprintf("Translate the following text to %s and remove all punctuation marks. Respond with only the translated text and nothing else.", targetLang)},
 			{Role: "user", Content: text},
@@ -83,7 +83,7 @@ func TranslateText(text, targetLang string) (string, error) {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+openAIKey)
+	req.Header.Set("Authorization", "Bearer "+userSetting.AIToken)
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
@@ -109,9 +109,9 @@ func TranslateText(text, targetLang string) (string, error) {
 	return result.Choices[0].Message.Content, nil
 }
 
-func GetSummary(text string) (string, error) {
+func GetSummary(text string, userSetting *models.UserSettings) (string, error) {
 	requestBody, err := json.Marshal(models.OpenAIRequest{
-		Model: "gpt-4-turbo",
+		Model: userSetting.GPTModel,
 		Messages: []models.Message{
 			{Role: "system", Content: "Summarize the following text in a concise manner."},
 			{Role: "user", Content: text},
@@ -128,7 +128,7 @@ func GetSummary(text string) (string, error) {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+openAIKey)
+	req.Header.Set("Authorization", "Bearer "+userSetting.AIToken)
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)

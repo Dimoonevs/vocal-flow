@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-func CreateTranscription(id int, langs []string) (map[string]string, error) {
+func CreateTranscription(id int, langs []string, userID, settingsID int) (map[string]string, error) {
 	URI, err := mysql.GetConnection().GetURIByID(id)
 	if err != nil {
 		return nil, err
@@ -21,8 +21,11 @@ func CreateTranscription(id int, langs []string) (map[string]string, error) {
 		logrus.Errorf("video %d in db not exist", id)
 		return nil, fmt.Errorf("video in db not exist")
 	}
-
-	transcription, err := lib.TranscribeVideo(URI)
+	userSetting, err := mysql.GetConnection().GetUserSetting(userID, settingsID)
+	if err != nil {
+		return nil, err
+	}
+	transcription, err := lib.TranscribeVideo(URI, userSetting)
 	if err != nil {
 		return nil, fmt.Errorf("transcription failed: %w", err)
 	}
@@ -66,7 +69,7 @@ func CreateTranscription(id int, langs []string) (map[string]string, error) {
 			wg.Add(1)
 			go func(idx int, lang string, segment models.Segments) {
 				defer wg.Done()
-				translatedText, err := lib.TranslateText(segment.Text, lang)
+				translatedText, err := lib.TranslateText(segment.Text, lang, userSetting)
 				if err != nil {
 					logrus.Errorf("Translation to %s failed: %v", lang, err)
 					stopOnce.Do(func() { errChan <- fmt.Errorf("translation to %s failed: %w", lang, err) })
@@ -154,8 +157,12 @@ func StitchSubtitlesIntoVideo(id int) (string, error) {
 	return libVideo.GetVideoPublicLink(localPath), nil
 }
 
-func GetSummary(id int) (string, error) {
+func GetSummary(id, userID, settingsID int) (string, error) {
 	originPath, err := mysql.GetConnection().GetOriginalSubtitles(id)
+	userSetting, err := mysql.GetConnection().GetUserSetting(userID, settingsID)
+	if err != nil {
+		return "", err
+	}
 	if err != nil {
 		return "", err
 	}
@@ -163,7 +170,7 @@ func GetSummary(id int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	summary, err := lib.GetSummary(text)
+	summary, err := lib.GetSummary(text, userSetting)
 	if err != nil {
 		return "", err
 	}
