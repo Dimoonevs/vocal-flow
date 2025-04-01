@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	libVideo "github.com/Dimoonevs/video-service/app/pkg/lib"
 	"github.com/Dimoonevs/vocal-flow/app/internal/models"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -109,11 +110,11 @@ func TranslateText(text, targetLang string, userSetting *models.UserSettings) (s
 	return result.Choices[0].Message.Content, nil
 }
 
-func GetSummary(text string, userSetting *models.UserSettings) (string, error) {
+func GetSummary(text, lang string, userSetting *models.UserSettings) (string, error) {
 	requestBody, err := json.Marshal(models.OpenAIRequest{
 		Model: userSetting.GPTModel,
 		Messages: []models.Message{
-			{Role: "system", Content: "Summarize the following text in a concise manner."},
+			{Role: "system", Content: fmt.Sprintf("Briefly summarize the following text. The output language should be: %s", lang)},
 			{Role: "user", Content: text},
 		},
 		MaxTokens: 300,
@@ -156,4 +157,31 @@ func GetSummary(text string, userSetting *models.UserSettings) (string, error) {
 	}
 
 	return result.Choices[0].Message.Content, nil
+}
+
+func TransformDataAI(data *models.DataAI) {
+	if data.SubtitlesURL.Valid {
+		// Преобразуем JSON-массив строк в структуру
+		var subs []struct {
+			URI  string `json:"uri"`
+			Lang string `json:"lang"`
+		}
+		if err := json.Unmarshal([]byte(data.SubtitlesURL.String), &subs); err == nil {
+			for i := range subs {
+				subs[i].URI = libVideo.GetVideoPublicLink(subs[i].URI)
+			}
+			// Сохраняем обратно преобразованный JSON
+			if updated, err := json.Marshal(subs); err == nil {
+				data.SubtitlesURL.String = string(updated)
+			}
+		}
+	}
+
+	if data.SubtitlesVideoURL.Valid {
+		data.SubtitlesVideoURL.String = libVideo.GetVideoPublicLink(data.SubtitlesVideoURL.String)
+	}
+
+	if data.TranslateVideoURL.Valid {
+		data.TranslateVideoURL.String = libVideo.GetVideoPublicLink(data.TranslateVideoURL.String)
+	}
 }

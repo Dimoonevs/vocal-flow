@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	libVideo "github.com/Dimoonevs/video-service/app/pkg/lib"
+	"github.com/Dimoonevs/vocal-flow/app/internal/lib"
 	"github.com/Dimoonevs/vocal-flow/app/internal/models"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
@@ -148,7 +150,7 @@ func (s *Storage) GetOriginalSubtitles(id int) (string, error) {
 
 	for _, subtitles := range subtitlesData {
 		if subtitles.Lang == "original" {
-			return subtitles.URI, nil
+			return libVideo.GetVideoLocalLink(subtitles.URI), nil
 		}
 	}
 	logrus.Errorf("Failed to get original subtitles from DB: %v", err)
@@ -186,8 +188,9 @@ func (s *Storage) GetDataByVideoID(id int) (*models.DataAI, error) {
 		logrus.Errorf("Failed to get subtitles from DB: %v", err)
 		return nil, err
 	}
-	return dataAI, nil
 
+	lib.TransformDataAI(dataAI)
+	return dataAI, nil
 }
 
 func (s *Storage) GetAllDataByUserID(userID int) ([]*models.DataAI, error) {
@@ -223,6 +226,8 @@ func (s *Storage) GetAllDataByUserID(userID int) ([]*models.DataAI, error) {
 			logrus.Errorf("Failed to scan row: %v", err)
 			continue
 		}
+
+		lib.TransformDataAI(dataAI)
 		result = append(result, dataAI)
 	}
 

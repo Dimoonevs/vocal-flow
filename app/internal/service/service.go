@@ -48,7 +48,7 @@ func CreateTranscription(id int, langs []string, userID, settingsID int) (map[st
 		return nil, err
 	}
 
-	subtitlesMap["original"] = originalFilePath
+	subtitlesMap["original"] = libVideo.GetVideoPublicLink(originalFilePath)
 
 	var wg sync.WaitGroup
 	translations := make(map[string][]models.TranslatedSegment)
@@ -120,9 +120,10 @@ func CreateTranscription(id int, langs []string, userID, settingsID int) (map[st
 				logrus.Errorf("Failed to save SRT file for %s: %v", lang, err)
 				return
 			}
+			link := libVideo.GetVideoPublicLink(filePath)
 
 			mu.Lock()
-			subtitlesMap[lang] = filePath
+			subtitlesMap[lang] = link
 			mu.Unlock()
 		}(lang, segments)
 	}
@@ -157,7 +158,7 @@ func StitchSubtitlesIntoVideo(id int) (string, error) {
 	return libVideo.GetVideoPublicLink(localPath), nil
 }
 
-func GetSummary(id, userID, settingsID int) (string, error) {
+func GetSummary(id, userID, settingsID int, lang string) (string, error) {
 	originPath, err := mysql.GetConnection().GetOriginalSubtitles(id)
 	userSetting, err := mysql.GetConnection().GetUserSetting(userID, settingsID)
 	if err != nil {
@@ -170,7 +171,7 @@ func GetSummary(id, userID, settingsID int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	summary, err := lib.GetSummary(text, userSetting)
+	summary, err := lib.GetSummary(text, lang, userSetting)
 	if err != nil {
 		return "", err
 	}

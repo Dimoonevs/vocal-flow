@@ -114,12 +114,12 @@ func handleSummaryVideo(ctx *fasthttp.RequestCtx) {
 		respJSON.WriteJSONError(ctx, fasthttp.StatusUnauthorized, err, "Error getting user id: ")
 		return
 	}
-	if req.SettingID == 0 {
-		respJSON.WriteJSONError(ctx, fasthttp.StatusBadRequest, nil, "SettingID not specified or invalid")
+	if req.SettingID == 0 || len(req.Langs) == 0 {
+		respJSON.WriteJSONError(ctx, fasthttp.StatusBadRequest, nil, "SettingID or Lang not specified or invalid")
 		return
 	}
 
-	summary, err := service.GetSummary(req.ID, userID, req.SettingID)
+	summary, err := service.GetSummary(req.ID, userID, req.SettingID, req.Langs[0])
 	if err != nil {
 		respJSON.WriteJSONError(ctx, fasthttp.StatusNotFound, err, "Failed to get summary")
 		return
