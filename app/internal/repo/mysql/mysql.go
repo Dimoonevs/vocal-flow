@@ -57,6 +57,21 @@ func (s *Storage) GetURIByID(ID int) (string, error) {
 	return path, err
 }
 
+func (s *Storage) UpdateAIStatusByID(ID int, status models.StatusAI) error {
+	if !status.IsValid() {
+		return fmt.Errorf("invalid status_ai value: %s", status)
+	}
+
+	query := `
+		UPDATE files
+		SET status_ai = ?
+		WHERE id = ?
+	`
+
+	_, err := s.db.Exec(query, status, ID)
+	return err
+}
+
 func (s *Storage) SaveTranscription(subtitlesMap map[string]string, videoID int) error {
 	var subtitlesJSON []map[string]string
 	for lang, uri := range subtitlesMap {

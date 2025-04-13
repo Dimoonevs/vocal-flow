@@ -13,6 +13,11 @@ import (
 )
 
 func RequestHandler(ctx *fasthttp.RequestCtx) {
+	if string(ctx.Method()) == fasthttp.MethodOptions {
+		ctx.SetStatusCode(fasthttp.StatusOK)
+		return
+	}
+
 	path := string(ctx.URI().Path())
 
 	if !strings.HasPrefix(path, "/api-ai") {
@@ -30,11 +35,11 @@ func handleRoutes(ctx *fasthttp.RequestCtx, path string) {
 	remainingPath := path[len("/api-ai"):]
 
 	switch {
-	case remainingPath == "/transcription" && ctx.IsGet():
+	case remainingPath == "/transcription" && ctx.IsPost():
 		handleTranscriptionVideo(ctx)
-	case remainingPath == "/stitching/subtitles" && ctx.IsGet():
+	case remainingPath == "/stitching/subtitles" && ctx.IsPost():
 		handleStitchingSub(ctx)
-	case remainingPath == "/summary" && ctx.IsGet():
+	case remainingPath == "/summary" && ctx.IsPost():
 		handleSummaryVideo(ctx)
 	case remainingPath == "" && ctx.IsGet():
 		handleGetData(ctx)
@@ -73,12 +78,9 @@ func handleTranscriptionVideo(ctx *fasthttp.RequestCtx) {
 		respJSON.WriteJSONError(ctx, fasthttp.StatusBadRequest, nil, "No languages provided in 'len'")
 		return
 	}
-	resp, err := service.CreateTranscription(req.ID, req.Langs, userID, req.SettingID)
-	if err != nil {
-		respJSON.WriteJSONError(ctx, fasthttp.StatusInternalServerError, err, "Failed to create transcription")
-		return
-	}
-	respJSON.WriteJSONResponse(ctx, fasthttp.StatusCreated, "Created transcription", resp)
+	go service.CreateTranscription(req.ID, req.Langs, userID, req.SettingID)
+
+	respJSON.WriteJSONResponse(ctx, fasthttp.StatusCreated, "Create transcription in process", nil)
 }
 
 func handleStitchingSub(ctx *fasthttp.RequestCtx) {
@@ -118,13 +120,9 @@ func handleSummaryVideo(ctx *fasthttp.RequestCtx) {
 		respJSON.WriteJSONError(ctx, fasthttp.StatusBadRequest, nil, "SettingID or Lang not specified or invalid")
 		return
 	}
+	go service.GetSummary(req.ID, userID, req.SettingID, req.Langs[0])
 
-	summary, err := service.GetSummary(req.ID, userID, req.SettingID, req.Langs[0])
-	if err != nil {
-		respJSON.WriteJSONError(ctx, fasthttp.StatusNotFound, err, "Failed to get summary")
-		return
-	}
-	respJSON.WriteJSONResponse(ctx, fasthttp.StatusCreated, "Created summary", summary)
+	respJSON.WriteJSONResponse(ctx, fasthttp.StatusCreated, "Create summary in process", nil)
 }
 
 func handleGetData(ctx *fasthttp.RequestCtx) {

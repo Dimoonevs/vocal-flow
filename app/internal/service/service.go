@@ -12,22 +12,36 @@ import (
 	"sync"
 )
 
-func CreateTranscription(id int, langs []string, userID, settingsID int) (map[string]string, error) {
+func CreateTranscription(id int, langs []string, userID, settingsID int) {
 	URI, err := mysql.GetConnection().GetURIByID(id)
 	if err != nil {
-		return nil, err
+		logrus.Error(err)
+		return
+	}
+
+	defer func() {
+		if err != nil {
+			err = mysql.GetConnection().UpdateAIStatusByID(id, models.StatusAIError)
+		}
+	}()
+	err = mysql.GetConnection().UpdateAIStatusByID(id, models.StatusAIProcess)
+	if err != nil {
+		logrus.Error(err)
+		return
 	}
 	if URI == "" {
 		logrus.Errorf("video %d in db not exist", id)
-		return nil, fmt.Errorf("video in db not exist")
+		return
 	}
 	userSetting, err := mysql.GetConnection().GetUserSetting(userID, settingsID)
 	if err != nil {
-		return nil, err
+		logrus.Error(err)
+		return
 	}
 	transcription, err := lib.TranscribeVideo(URI, userSetting)
 	if err != nil {
-		return nil, fmt.Errorf("transcription failed: %w", err)
+		logrus.Errorf("transcription failed: %w", err)
+		return
 	}
 
 	dirPath := filepath.Dir(URI)
@@ -45,7 +59,7 @@ func CreateTranscription(id int, langs []string, userID, settingsID int) (map[st
 	originalFilePath, err := lib.SaveSRT("original", originalSegments, dirPath)
 	if err != nil {
 		logrus.Errorf("Failed to save original SRT: %v", err)
-		return nil, err
+		return
 	}
 
 	subtitlesMap["original"] = libVideo.GetVideoPublicLink(originalFilePath)
@@ -98,7 +112,8 @@ func CreateTranscription(id int, langs []string, userID, settingsID int) (map[st
 	}()
 
 	if err, ok := <-errChan; ok {
-		return nil, err
+		logrus.Error(err)
+		return
 	}
 
 	for lang, indexedSegments := range translationResults {
@@ -132,10 +147,15 @@ func CreateTranscription(id int, langs []string, userID, settingsID int) (map[st
 
 	if err := mysql.GetConnection().SaveTranscription(subtitlesMap, id); err != nil {
 		logrus.Errorf("Failed to save transcription: %v", err)
-		return nil, err
+		return
 	}
 
-	return subtitlesMap, nil
+	err = mysql.GetConnection().UpdateAIStatusByID(id, models.StatusAIDone)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+
 }
 
 func StitchSubtitlesIntoVideo(id int) (string, error) {
@@ -158,25 +178,45 @@ func StitchSubtitlesIntoVideo(id int) (string, error) {
 	return libVideo.GetVideoPublicLink(localPath), nil
 }
 
-func GetSummary(id, userID, settingsID int, lang string) (string, error) {
+func GetSummary(id, userID, settingsID int, lang string) {
 	originPath, err := mysql.GetConnection().GetOriginalSubtitles(id)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
 	userSetting, err := mysql.GetConnection().GetUserSetting(userID, settingsID)
 	if err != nil {
-		return "", err
+		logrus.Error(err)
+		return
 	}
+	defer func() {
+		if err != nil {
+			err = mysql.GetConnection().UpdateAIStatusByID(id, models.StatusAIError)
+		}
+	}()
+	err = mysql.GetConnection().UpdateAIStatusByID(id, models.StatusAIProcess)
 	if err != nil {
-		return "", err
+		logrus.Error(err)
+		return
 	}
 	text, err := lib.ReadSRTFile(originPath)
 	if err != nil {
-		return "", err
+		logrus.Error(err)
+		return
 	}
 	summary, err := lib.GetSummary(text, lang, userSetting)
 	if err != nil {
-		return "", err
+		logrus.Error(err)
+		return
 	}
 	if err = mysql.GetConnection().SaveSummary(summary, id); err != nil {
-		return "", err
+		logrus.Error(err)
+		return
 	}
-	return summary, nil
+
+	err = mysql.GetConnection().UpdateAIStatusByID(id, models.StatusAIDone)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
 }

@@ -1,6 +1,10 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"database/sql/driver"
+	"fmt"
+)
 
 type Video struct {
 	URI string `json:"uri"`
@@ -82,4 +86,37 @@ type DataAI struct {
 	SubtitlesVideoURL sql.NullString `json:"subtitles_video_url"`
 	TranslateVideoURL sql.NullString `json:"translate_video_url"`
 	Summary           sql.NullString `json:"summary"`
+}
+
+type StatusAI string
+
+const (
+	StatusAINon     StatusAI = "non"
+	StatusAIProcess StatusAI = "process"
+	StatusAIDone    StatusAI = "done"
+	StatusAIError   StatusAI = "error"
+)
+
+func (s StatusAI) IsValid() bool {
+	switch s {
+	case StatusAINon, StatusAIProcess, StatusAIDone, StatusAIError:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s StatusAI) Value() (driver.Value, error) {
+	if !s.IsValid() {
+		return nil, fmt.Errorf("invalid StatusAI: %s", s)
+	}
+	return string(s), nil
+}
+
+func (s *StatusAI) Scan(value interface{}) error {
+	if b, ok := value.([]byte); ok {
+		*s = StatusAI(string(b))
+		return nil
+	}
+	return fmt.Errorf("cannot scan StatusAI from %v", value)
 }
